@@ -10,6 +10,19 @@ from add_text import (
     images_to_pdf,
 )
 
+# Inject custom CSS to set the width of the sidebar
+st.markdown(
+    """
+    <style>
+        section[data-testid="stSidebar"] {
+            width: 500px !important; # Set the width to your desired value
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
 example_name = "John Cobra"
 example_affiliation = "Test Affiliation"
 
