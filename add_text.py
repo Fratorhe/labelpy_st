@@ -41,6 +41,7 @@ def add_text_to_image(
         font_paths = [
             "Arial.ttf",  # Linux
             "FreeMono.ttf",  # Linux
+            "Roboto.ttf",  # Linux
             "/Library/Fonts/Arial.ttf",  # macOS
             "C:\\Windows\\Fonts\\arial.ttf",  # Windows
         ]
