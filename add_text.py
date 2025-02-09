@@ -1,5 +1,4 @@
 import io
-import os
 
 import fpdf
 import pandas as pd
