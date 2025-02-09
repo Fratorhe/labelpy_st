@@ -39,7 +39,8 @@ def add_text_to_image(
     except:
         # In case the font file is not found, use arial
         font_paths = [
-            "/usr/share/fonts/truetype/msttcorefonts/arial.ttf",  # Linux
+            "Arial.ttf",  # Linux
+            "FreeMono.ttf",  # Linux
             "/Library/Fonts/Arial.ttf",  # macOS
             "C:\\Windows\\Fonts\\arial.ttf",  # Windows
         ]
