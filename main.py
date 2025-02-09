@@ -27,7 +27,7 @@ example_name = "John Cobra"
 example_affiliation = "Test Affiliation"
 
 # Streamlit App Title
-st.title("CSV File Uploader")
+st.title("Label generator")
 
 # Create a DataFrame with 2 rows and 3 columns, including names for rows and columns
 df_formatting = pd.DataFrame(
