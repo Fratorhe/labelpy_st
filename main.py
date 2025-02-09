@@ -82,7 +82,7 @@ if uploaded_file is not None:
     st.write("### Data Preview:")
     st.dataframe(df)
 
-if uploaded_card is not None:
+if uploaded_file is not None and uploaded_card is not None:
 
     st.download_button(
         label="Download image",
