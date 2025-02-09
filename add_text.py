@@ -1,4 +1,5 @@
 import io
+import os
 
 import fpdf
 import pandas as pd
@@ -37,7 +38,16 @@ def add_text_to_image(
         font = ImageFont.truetype(font_path, font_size)
     except:
         # In case the font file is not found, use arial
-        font = ImageFont.truetype("arial.ttf", font_size)
+        font_paths = [
+            "/usr/share/fonts/truetype/msttcorefonts/arial.ttf",  # Linux
+            "/Library/Fonts/Arial.ttf",  # macOS
+            "C:\\Windows\\Fonts\\arial.ttf",  # Windows
+        ]
+
+        # Check each font path in the list
+        for font_path in font_paths:
+            if os.path.exists(font_path):
+                font = ImageFont.truetype("arial.ttf", font_size)
 
     # Get text size to center it using textbbox
     bbox = draw.textbbox((0, 0), text, font=font)
