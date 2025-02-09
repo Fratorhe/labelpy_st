@@ -35,21 +35,9 @@ def add_text_to_image(
 
     # Load font
     try:
-        font = ImageFont.truetype(font_path, font_size)
-    except:
-        # In case the font file is not found, use arial
-        font_paths = [
-            "Arial.ttf",  # Linux
-            "FreeMono.ttf",  # Linux
-            "Roboto.ttf",  # Linux
-            "/Library/Fonts/Arial.ttf",  # macOS
-            "C:\\Windows\\Fonts\\arial.ttf",  # Windows
-        ]
-
-        # Check each font path in the list
-        for font_path in font_paths:
-            if os.path.exists(font_path):
-                font = ImageFont.truetype("arial.ttf", font_size)
+        font = ImageFont.truetype("arial.ttf", font_size)
+    except IOError:
+        font = ImageFont.load_default()
 
     # Get text size to center it using textbbox
     bbox = draw.textbbox((0, 0), text, font=font)
