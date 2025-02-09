@@ -40,14 +40,14 @@ def add_text_to_image(
         font = ImageFont.load_default()
 
     # Get text size to center it using textbbox
-    bbox = draw.textbbox((0, 0), text, font=font)
+    bbox = draw.textbbox((0, 0), text, font=font, font_size=font_size)
     text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
     # Calculate position to center text
     x = (width - text_width) // 2 + offset_x
     y = (height - text_height) // 2 - offset_y
 
     # Add text to image
-    draw.text((x, y), text, fill=text_color, font=font)
+    draw.text((x, y), text, fill=text_color, font=font, font_size=font_size)
 
     if save:
         output_path = "output.jpg"
