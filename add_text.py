@@ -132,68 +132,68 @@ def apply_texts_to_image(
 from PIL import Image
 
 
-def images_to_pdf(images, rows, columns, dpi=300, page_margin_px=20, gutter_px=10):
-    """
-    Compose images into a grid on letter-sized pages using PIL only.
-    Returns a BytesIO PDF stream.
-    """
-    if not images:
-        raise ValueError("No images to convert to PDF.")
+# def images_to_pdf(images, rows, columns, dpi=300, page_margin_px=20, gutter_px=10):
+#     """
+#     Compose images into a grid on letter-sized pages using PIL only.
+#     Returns a BytesIO PDF stream.
+#     """
+#     if not images:
+#         raise ValueError("No images to convert to PDF.")
 
-    # Page size in pixels at the chosen dpi (8.5x11 in)
-    page_w = int(8.5 * dpi)
-    page_h = int(11.0 * dpi)
-    page_size = (page_w, page_h)
+#     # Page size in pixels at the chosen dpi (8.5x11 in)
+#     page_w = int(8.5 * dpi)
+#     page_h = int(11.0 * dpi)
+#     page_size = (page_w, page_h)
 
-    imgs_per_row = max(1, int(columns))
-    imgs_per_col = max(1, int(rows))
-    imgs_per_page = imgs_per_row * imgs_per_col
+#     imgs_per_row = max(1, int(columns))
+#     imgs_per_col = max(1, int(rows))
+#     imgs_per_page = imgs_per_row * imgs_per_col
 
-    # Compute drawable area and per-cell max size
-    drawable_w = page_w - 2 * page_margin_px - (imgs_per_row - 1) * gutter_px
-    drawable_h = page_h - 2 * page_margin_px - (imgs_per_col - 1) * gutter_px
-    cell_w = drawable_w // imgs_per_row
-    cell_h = drawable_h // imgs_per_col
+#     # Compute drawable area and per-cell max size
+#     drawable_w = page_w - 2 * page_margin_px - (imgs_per_row - 1) * gutter_px
+#     drawable_h = page_h - 2 * page_margin_px - (imgs_per_col - 1) * gutter_px
+#     cell_w = drawable_w // imgs_per_row
+#     cell_h = drawable_h // imgs_per_col
 
-    pdf_pages = []
-    page = Image.new("RGB", page_size, "white")
+#     pdf_pages = []
+#     page = Image.new("RGB", page_size, "white")
 
-    def cell_origin(idx_within_page):
-        r = idx_within_page // imgs_per_row
-        c = idx_within_page % imgs_per_row
-        x = page_margin_px + c * (cell_w + gutter_px)
-        y = page_margin_px + r * (cell_h + gutter_px)
-        return x, y
+#     def cell_origin(idx_within_page):
+#         r = idx_within_page // imgs_per_row
+#         c = idx_within_page % imgs_per_row
+#         x = page_margin_px + c * (cell_w + gutter_px)
+#         y = page_margin_px + r * (cell_h + gutter_px)
+#         return x, y
 
-    j = 0  # index within current page
+#     j = 0  # index within current page
 
-    for img in images:
-        # ensure RGB and copy before thumbnail so we don't mutate original
-        work = img.convert("RGB").copy()
-        work.thumbnail((cell_w, cell_h))  # in-place, preserves aspect
+#     for img in images:
+#         # ensure RGB and copy before thumbnail so we don't mutate original
+#         work = img.convert("RGB").copy()
+#         work.thumbnail((cell_w, cell_h))  # in-place, preserves aspect
 
-        x, y = cell_origin(j)
-        # center inside the cell
-        paste_x = x + (cell_w - work.width) // 2
-        paste_y = y + (cell_h - work.height) // 2
-        page.paste(work, (paste_x, paste_y))
+#         x, y = cell_origin(j)
+#         # center inside the cell
+#         paste_x = x + (cell_w - work.width) // 2
+#         paste_y = y + (cell_h - work.height) // 2
+#         page.paste(work, (paste_x, paste_y))
 
-        j += 1
-        if j == imgs_per_page:
-            pdf_pages.append(page)
-            page = Image.new("RGB", page_size, "white")
-            j = 0
+#         j += 1
+#         if j == imgs_per_page:
+#             pdf_pages.append(page)
+#             page = Image.new("RGB", page_size, "white")
+#             j = 0
 
-    # flush last partially filled page
-    if j != 0:
-        pdf_pages.append(page)
+#     # flush last partially filled page
+#     if j != 0:
+#         pdf_pages.append(page)
 
-    # Save all pages to a single PDF in-memory
-    buf = io.BytesIO()
-    # Pillow can save multi-page PDFs by passing the remaining images via append_images
-    pdf_pages[0].save(buf, format="PDF", save_all=True, append_images=pdf_pages[1:])
-    buf.seek(0)
-    return buf
+#     # Save all pages to a single PDF in-memory
+#     buf = io.BytesIO()
+#     # Pillow can save multi-page PDFs by passing the remaining images via append_images
+#     pdf_pages[0].save(buf, format="PDF", save_all=True, append_images=pdf_pages[1:])
+#     buf.seek(0)
+#     return buf
 
 def create_pdf_name_affiliation(
     base_image, df_formatting, df_names_affiliations
@@ -211,7 +211,7 @@ def create_pdf_name_affiliation(
     # creates the images and adds them to the container
     images = []
     for index, row in df_names_affiliations.iterrows():
-        name = row.Name
+        name = row.Name.title() # title makes format as: Name Last Name
         affiliation = row.Institution
         modified_image = apply_name_affiliation_image(
             base_image, df_formatting, name=name, affiliation=affiliation

@@ -8,14 +8,23 @@ base_image = Image.open("badge.png")
 # First number is for names, second for affiliations
 df_formatting = pd.DataFrame(
         {
-            "Font size, px": [120, 75],
+            "Font size, px": [100, 75],
             "Offset x, %": [0, 0],
             "Offset y, %": [-30, -40],
         },
         index=["Names", "Affiliations"],
     )
 
-df_names_affiliations = pd.read_csv("data.csv")
+df_names_affiliations = pd.read_csv("attendees.csv",sep='\t')
+
+# Map your CSV’s columns to the expected ones
+column_map = {
+    "NAME": "Name",
+    "INSTITUTION": "Institution"
+}
+
+# Rename only if the expected columns are missing
+df_names_affiliations.rename(columns=column_map, inplace=True)
 
 images = create_pdf_name_affiliation(
     base_image, df_formatting, df_names_affiliations
