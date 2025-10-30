@@ -1,5 +1,6 @@
 import io
 import os
+import tempfile
 
 import fpdf
 import pandas as pd
@@ -16,45 +17,43 @@ def add_text_to_image(
     save=False,
 ):
     """
-    Adds text to an image and returns the modified image in memory.
-
-    :param image: PIL Image object.
-    :param text: Text to add to the image.
-    :param offset: Tuple (x, y) indicating text offset % wrt to the center.
-    Center of coordinates located in the center (x positive right, y positive up)
-    :param font_path: Path to a .ttf font file (default is None, which uses a system default font).
-    :param font_size: Font size.
-    :param text_color: Tuple (R, G, B) representing text color.
+    Adds centered text to an image with offsets given in % of width/height.
+    Positive x moves right. Positive y moves UP (per your docstring).
     """
     draw = ImageDraw.Draw(image)
-    # Get image size
     width, height = image.size
 
-    offset_x = offset[0] * width / 100
-    offset_y = offset[1] * height / 100
+    # percent offsets -> pixels
+    offset_x = (offset[0] * width) / 100.0
+    offset_y = (offset[1] * height) / 100.0
 
-    # Load font
+    # load font (use provided font_path if given)
     try:
-        font = ImageFont.truetype("./fonts/Cherona.otf", font_size)
-    except IOError:
-        font = ImageFont.load_default()
+        if font_path:
+            font = ImageFont.truetype(font_path, font_size)
+        else:
+            # fallback to a common font if available, else default bitmap
+            font = ImageFont.truetype("./fonts/OpenSans2.ttf", font_size)
+    except Exception:
+        try:
+            font = ImageFont.truetype("arial.ttf", font_size)
+        except Exception:
+            font = ImageFont.load_default()
 
-    # Get text size to center it using textbbox
-    bbox = draw.textbbox((0, 0), text, font=font, font_size=font_size)
+    # text bbox for centering
+    bbox = draw.textbbox((0, 0), text, font=font)
     text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    # Calculate position to center text
-    x = (width - text_width) // 2 + offset_x
-    y = (height - text_height) // 2 - offset_y
 
-    # Add text to image
-    draw.text((x, y), text, fill=text_color, font=font, font_size=font_size)
+    # center, then apply offsets (y positive up means subtract)
+    x = (width - text_width) / 2.0 + offset_x
+    y = (height - text_height) / 2.0 - offset_y
+
+    draw.text((x, y), text, fill=text_color, font=font)
 
     if save:
-        output_path = "output.jpg"
-        image.save(output_path)
+        image.save("output.jpg")
 
     return image
-
 
 def apply_name_affiliation_image(base_image, df_formatting, name, affiliation):
     """
@@ -133,91 +132,71 @@ def apply_texts_to_image(
 from PIL import Image
 
 
-def images_to_pdf(images, rows, columns, dpi=300):
+def images_to_pdf(images, rows, columns, dpi=300, page_margin_px=20, gutter_px=10):
     """
-    Combines multiple in-memory images into a single PDF file with letter size,
-    placing them on a grid of up to 6 images per page while preserving aspect ratio,
-    at the specified DPI.
-
-    :param images: List of PIL Image objects. The images to be combined into the PDF.
-    :param rows: int. The number of rows to place the images on each page.
-    :param columns: int. The number of columns to place the images on each page.
-    :param dpi: int, optional. The DPI for the output PDF. Default is 300.
+    Compose images into a grid on letter-sized pages using PIL only.
+    Returns a BytesIO PDF stream.
     """
     if not images:
-        print("No images to convert to PDF.")
-        return
+        raise ValueError("No images to convert to PDF.")
 
-    # Set page size at the desired DPI (150 DPI here)
-    page_size = (612 * dpi // 72, 792 * dpi // 72)  # Convert from 72 DPI to desired DPI
-    images_per_row = columns
-    images_per_column = rows
-    images_per_page = images_per_row * images_per_column
-    max_width = page_size[0] // images_per_row - 20  # 20 for margin between images
-    max_height = page_size[1] // images_per_column - 20  # 20 for margin between images
+    # Page size in pixels at the chosen dpi (8.5x11 in)
+    page_w = int(8.5 * dpi)
+    page_h = int(11.0 * dpi)
+    page_size = (page_w, page_h)
 
-    x_offset = 10  # Initial horizontal offset
-    y_offset = 50  # Initial vertical offset
+    imgs_per_row = max(1, int(columns))
+    imgs_per_col = max(1, int(rows))
+    imgs_per_page = imgs_per_row * imgs_per_col
 
-    pdf_pages = []  # List to store each page as an Image object
+    # Compute drawable area and per-cell max size
+    drawable_w = page_w - 2 * page_margin_px - (imgs_per_row - 1) * gutter_px
+    drawable_h = page_h - 2 * page_margin_px - (imgs_per_col - 1) * gutter_px
+    cell_w = drawable_w // imgs_per_row
+    cell_h = drawable_h // imgs_per_col
 
-    j = 0
-    page = Image.new("RGB", page_size, "white")  # Create a new blank page
-    pdf = fpdf.FPDF()
-    pdf.add_page()
+    pdf_pages = []
+    page = Image.new("RGB", page_size, "white")
 
-    for i, img in enumerate(images):
-        # Resize image to fit within the max width and height while maintaining aspect ratio
-        img.thumbnail((max_width, max_height))
+    def cell_origin(idx_within_page):
+        r = idx_within_page // imgs_per_row
+        c = idx_within_page % imgs_per_row
+        x = page_margin_px + c * (cell_w + gutter_px)
+        y = page_margin_px + r * (cell_h + gutter_px)
+        return x, y
 
-        # Paste the image onto the page at the correct position
-        page.paste(img, (x_offset, y_offset))
-        pdf.image(page)
+    j = 0  # index within current page
 
-        # Update x_offset and y_offset for the next image
-        if (j + 1) % images_per_row == 0:
-            # Move to the next row
-            x_offset = 10
-            y_offset += max_height + 10  # Add some space between rows
-        else:
-            # Move to the next column
-            x_offset += max_width + 10  # Add some space between columns
+    for img in images:
+        # ensure RGB and copy before thumbnail so we don't mutate original
+        work = img.convert("RGB").copy()
+        work.thumbnail((cell_w, cell_h))  # in-place, preserves aspect
 
-        # If we've placed 6 images, finish this page and start a new one
-        if (j + 1) % images_per_page == 0:
-            pdf_pages.append(page)  # Add the page to the PDF list
-            page = Image.new(
-                "RGB", page_size, "white"
-            )  # Create a new blank page for the next set of images
-            x_offset = 10  # Reset horizontal position for the new page
-            y_offset = 50  # Reset vertical position for the new page
-            j = 0  # Reset image count for the new page
+        x, y = cell_origin(j)
+        # center inside the cell
+        paste_x = x + (cell_w - work.width) // 2
+        paste_y = y + (cell_h - work.height) // 2
+        page.paste(work, (paste_x, paste_y))
 
-        else:
-            j += 1
+        j += 1
+        if j == imgs_per_page:
+            pdf_pages.append(page)
+            page = Image.new("RGB", page_size, "white")
+            j = 0
 
-    # Add any remaining images on the last page
-    if j > 0:
+    # flush last partially filled page
+    if j != 0:
         pdf_pages.append(page)
 
-    # Save the images as a PDF
-
-    # if we dump to a file directly
-    # pdf_file = "test.pdf"
-    # pdf_pages[0].save(pdf_file, "PDF", save_all=True, append_images=pdf_pages[1:])
-
-    # if we do as a stream
-    pdf_stream = io.BytesIO()
-    pdf_pages[0].save(pdf_stream, "PDF", save_all=True, append_images=pdf_pages[1:])
-    # save the PDF to a file
-    # with open("outpudfsdft.pdf", "wb") as f:
-    #     f.write(pdf_stream.getvalue())
-
-    return pdf_stream
-
+    # Save all pages to a single PDF in-memory
+    buf = io.BytesIO()
+    # Pillow can save multi-page PDFs by passing the remaining images via append_images
+    pdf_pages[0].save(buf, format="PDF", save_all=True, append_images=pdf_pages[1:])
+    buf.seek(0)
+    return buf
 
 def create_pdf_name_affiliation(
-    base_image, df_formatting, df_names_affiliations, df_to_pdf_options
+    base_image, df_formatting, df_names_affiliations
 ):
     """
     Creates a PDF containing images with names and affiliations added to a base image.
@@ -233,20 +212,69 @@ def create_pdf_name_affiliation(
     images = []
     for index, row in df_names_affiliations.iterrows():
         name = row.Name
-        affiliation = row.Affiliation
+        affiliation = row.Institution
         modified_image = apply_name_affiliation_image(
             base_image, df_formatting, name=name, affiliation=affiliation
         )
         images.append(modified_image)
 
-    # Extract rows and columns for the PDF layout
-    rows = df_to_pdf_options.loc["Number", "Rows"]
-    columns = df_to_pdf_options.loc["Number", "Columns"]
-
     # Convert the list of images into a PDF buffer
-    pdf_buffer = images_to_pdf(images, rows=rows, columns=columns)
-    return pdf_buffer
+    # pdf_buffer = images_to_pdf(images, rows=rows, columns=columns)
+    return images
 
+
+def images_to_pdf_2up_landscape(images, margin_in=1.0, gutter_in=0.25):
+    """
+    Create a 2-up (two per page) PDF on US-letter landscape (11 x 8.5 in),
+    placing each image at exactly 4 x 6 inches (W x H). Uses FPDF to embed
+    PNGs losslessly (no recompression). Returns a BytesIO buffer.
+    """
+    if not images:
+        raise ValueError("No images provided")
+
+    # Page setup in inches
+    page_w, page_h = 11.0, 8.5
+    card_w, card_h = 4.0, 6.0  # your images are 4x6 (W x H) inches
+    # Compute horizontal placement
+    total_cards_w = (card_w * 2) + gutter_in
+    if total_cards_w + 2 * margin_in > page_w or card_h + 2 * margin_in > page_h:
+        raise ValueError("Margins/gutter too large to fit two 4x6 cards on the page.")
+
+    left_x = (page_w - total_cards_w) / 2.0
+    right_x = left_x + card_w + gutter_in
+    y_pos = (page_h - card_h) / 2.0  # vertical centering
+
+    # Write each image to a temporary PNG file (lossless)
+    tmp_paths = []
+    try:
+        for im in images:
+            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            tmp_paths.append(tmp.name)
+            im.convert("RGB").save(tmp.name, format="PNG")  # no recompression loss
+            tmp.close()
+
+        pdf = fpdf.FPDF(orientation="L", unit="in", format="Letter")
+        # Add images in pairs per page
+        for i in range(0, len(tmp_paths), 2):
+            pdf.add_page()
+            # Left image
+            pdf.image(tmp_paths[i], x=left_x, y=y_pos, w=card_w, h=card_h)
+            # Right image, if present
+            if i + 1 < len(tmp_paths):
+                pdf.image(tmp_paths[i + 1], x=right_x, y=y_pos, w=card_w, h=card_h)
+
+        # Export to BytesIO
+        pdf_bytes = pdf.output(dest="S").encode("latin-1")
+        buf = io.BytesIO(pdf_bytes)
+        buf.seek(0)
+        return buf
+    finally:
+        # Clean up temporaries
+        for p in tmp_paths:
+            try:
+                os.remove(p)
+            except Exception:
+                pass
 
 if __name__ == "__main__":
     image_name = "card_example.jpg"
@@ -265,7 +293,7 @@ if __name__ == "__main__":
 
     # Example usage
     images = apply_texts_to_image(
-        "card_example.jpg",
+        "badge.png",
         my_list,
         font_size=150,
         text_color=(255, 0, 0),
@@ -283,7 +311,7 @@ if __name__ == "__main__":
     df_names_affiliations = pd.DataFrame(
         {
             "Name": ["Fran", "Luis", "asfd"],
-            "Affiliation": ["uiu", "df", "dfdf"],
+            "Institution": ["uiu", "df", "dfdf"],
         },
     )
     df_to_pdf_options = pd.DataFrame(
@@ -294,7 +322,7 @@ if __name__ == "__main__":
         index=["Number"],
     )
     pdf_buffer = create_pdf_name_affiliation(
-        base_image, df_formatting, df_names_affiliations, df_to_pdf_options
+        base_image, df_formatting, df_names_affiliations
     )
 
     # Optionally, save the PDF to a file
