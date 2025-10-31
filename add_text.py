@@ -5,6 +5,14 @@ import tempfile
 import fpdf
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
+from io import BytesIO
+from PyPDF2 import PdfReader, PdfWriter
+
+
 
 
 def add_text_to_image(
@@ -15,6 +23,7 @@ def add_text_to_image(
     font_size=200,
     text_color=(255, 0, 0),
     save=False,
+    max_width_ratio=0.9,
 ):
     """
     Adds centered text to an image with offsets given in % of width/height.
@@ -40,20 +49,54 @@ def add_text_to_image(
         except Exception:
             font = ImageFont.load_default()
 
-    # text bbox for centering
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    # wrapping text
+    max_text_width = width * max_width_ratio
+    words = text.split()
+    lines = []
+    current_line = words[0]
 
-    # center, then apply offsets (y positive up means subtract)
-    x = (width - text_width) / 2.0 + offset_x
-    y = (height - text_height) / 2.0 - offset_y
+    for word in words[1:]:
+        line_test = current_line + " " + word
+        if draw.textlength(line_test, font=font) <= max_text_width:
+            current_line = line_test
+        else:
+            lines.append(current_line)
+            current_line = word
+    lines.append(current_line)
 
-    draw.text((x, y), text, fill=text_color, font=font)
+    # compute total height for centering
+    line_height = font.getbbox("A")[3] - font.getbbox("A")[1] + 20
+    total_text_height = line_height * len(lines)
+
+    # starting y (centered vertically)
+    y = (height - total_text_height) / 2.0 - offset_y
+
+    # draw each line centered
+    for line in lines:
+        line_width = draw.textlength(line, font=font)
+        x = (width - line_width) / 2.0 + offset_x
+        draw.text((x, y), line, fill=text_color, font=font)
+        y += line_height
 
     if save:
         image.save("output.jpg")
 
     return image
+
+    # # text bbox for centering
+    # bbox = draw.textbbox((0, 0), text, font=font)
+    # text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+
+    # # center, then apply offsets (y positive up means subtract)
+    # x = (width - text_width) / 2.0 + offset_x
+    # y = (height - text_height) / 2.0 - offset_y
+
+    # draw.text((x, y), text, fill=text_color, font=font)
+
+    # if save:
+    #     image.save("output.jpg")
+
+    # return image
 
 def apply_name_affiliation_image(base_image, df_formatting, name, affiliation):
     """
@@ -328,3 +371,67 @@ if __name__ == "__main__":
     # Optionally, save the PDF to a file
     with open("output_test.pdf", "wb") as f:
         f.write(pdf_buffer.getvalue())
+
+
+def add_crop_marks(pdf_buffer, mark_len=1000, mark_thickness=1, margin_in=0.25, gap_in=0.25):
+    """
+    Adds outward-facing L-shaped crop marks around each badge on a 2-up LANDSCAPE page.
+    Marks begin at each badge corner and extend outward toward the page edges.
+    """
+    input_pdf = PdfReader(pdf_buffer)
+    output_pdf = PdfWriter()
+
+    page_width, page_height = landscape(letter)
+    # Badge and page geometry (in points)
+    badge_width = 4 * inch
+    badge_height = 6 * inch
+    gap = 0.25 * inch
+    page_width, page_height = landscape(letter)
+
+    # Center horizontally and vertically
+    horizontal_margin = (page_width - (2 * badge_width + gap)) / 2
+    vertical_margin = (page_height - badge_height) / 2
+
+    # Badge coordinates
+    left_x1 = horizontal_margin
+    left_x2 = left_x1 + badge_width
+    right_x1 = left_x2 + gap
+    right_x2 = right_x1 + badge_width
+    y_bottom = vertical_margin
+    y_top = y_bottom + badge_height
+
+    for page in input_pdf.pages:
+        packet = BytesIO()
+        c = canvas.Canvas(packet, pagesize=(page_width, page_height))
+        c.setStrokeColorRGB(0, 0, 0)
+        c.setLineWidth(mark_thickness)
+
+        def draw_outward_marks(x_left, x_right):
+            """Draw marks extending OUT from the badge corners"""
+            # bottom-left (outward: down & left)
+            c.line(x_left, y_bottom, x_left - mark_len, y_bottom)
+            c.line(x_left, y_bottom, x_left, y_bottom - mark_len)
+            # bottom-right (outward: down & right)
+            c.line(x_right, y_bottom, x_right + mark_len, y_bottom)
+            c.line(x_right, y_bottom, x_right, y_bottom - mark_len)
+            # top-left (outward: up & left)
+            c.line(x_left, y_top, x_left - mark_len, y_top)
+            c.line(x_left, y_top, x_left, y_top + mark_len)
+            # top-right (outward: up & right)
+            c.line(x_right, y_top, x_right + mark_len, y_top)
+            c.line(x_right, y_top, x_right, y_top + mark_len)
+
+        # marks for each badge
+        draw_outward_marks(left_x1, left_x2)
+        draw_outward_marks(right_x1, right_x2)
+
+        c.save()
+        packet.seek(0)
+        overlay_pdf = PdfReader(packet)
+        page.merge_page(overlay_pdf.pages[0])
+        output_pdf.add_page(page)
+
+    output_buffer = BytesIO()
+    output_pdf.write(output_buffer)
+    output_buffer.seek(0)
+    return output_buffer
