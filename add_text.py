@@ -7,7 +7,7 @@ import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
-from reportlab.lib.units import inch
+from reportlab.lib.units import inch, cm
 from reportlab.lib.utils import ImageReader
 from io import BytesIO
 from PyPDF2 import PdfReader, PdfWriter
@@ -373,7 +373,7 @@ if __name__ == "__main__":
         f.write(pdf_buffer.getvalue())
 
 
-def add_crop_marks(pdf_buffer, mark_len=1000, mark_thickness=1, margin_in=0.25, gap_in=0.25):
+def add_crop_marks(pdf_buffer, mark_len=1000, mark_thickness=0.5, margin_in=0.25, gap_in=0.25):
     """
     Adds outward-facing L-shaped crop marks around each badge on a 2-up LANDSCAPE page.
     Marks begin at each badge corner and extend outward toward the page edges.
@@ -407,19 +407,21 @@ def add_crop_marks(pdf_buffer, mark_len=1000, mark_thickness=1, margin_in=0.25, 
         c.setLineWidth(mark_thickness)
 
         def draw_outward_marks(x_left, x_right):
-            """Draw marks extending OUT from the badge corners"""
+            """Draw marks extending OUT sfrom the badge corners"""
+            offset1 = 12 * cm 
+            offset2 = 1.5 * cm
             # bottom-left (outward: down & left)
-            c.line(x_left, y_bottom, x_left - mark_len, y_bottom)
-            c.line(x_left, y_bottom, x_left, y_bottom - mark_len)
+            c.line(x_left - offset1, y_bottom, x_left - offset1 - mark_len, y_bottom)
+            c.line(x_left, y_bottom - offset2, x_left, y_bottom - offset2 - mark_len)
             # bottom-right (outward: down & right)
-            c.line(x_right, y_bottom, x_right + mark_len, y_bottom)
-            c.line(x_right, y_bottom, x_right, y_bottom - mark_len)
+            c.line(x_right + offset1, y_bottom, x_right + offset1 + mark_len, y_bottom)
+            c.line(x_right, y_bottom - offset2, x_right, y_bottom - offset2 - mark_len)
             # top-left (outward: up & left)
-            c.line(x_left, y_top, x_left - mark_len, y_top)
-            c.line(x_left, y_top, x_left, y_top + mark_len)
+            c.line(x_left - offset1, y_top, x_left - offset1 - mark_len, y_top)
+            c.line(x_left, y_top + offset2, x_left, y_top + offset2 + mark_len)
             # top-right (outward: up & right)
-            c.line(x_right, y_top, x_right + mark_len, y_top)
-            c.line(x_right, y_top, x_right, y_top + mark_len)
+            c.line(x_right + offset1, y_top, x_right + offset1 + mark_len, y_top)
+            c.line(x_right, y_top + offset2, x_right, y_top + offset2 + mark_len)
 
         # marks for each badge
         draw_outward_marks(left_x1, left_x2)
