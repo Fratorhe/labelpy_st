@@ -1,7 +1,12 @@
 import pandas as pd
 from PIL import Image
 
-from add_text import create_pdf_name_affiliation, images_to_pdf_2up_landscape, add_crop_marks
+from add_text import (
+    add_crop_marks,
+    create_pdf_name_affiliation,
+    images_to_pdf_2up_landscape,
+)
+from merge_registrations import merge_registrations
 
 base_image = Image.open("badge.png")
 
@@ -15,7 +20,9 @@ df_formatting = pd.DataFrame(
         index=["Names", "Affiliations"],
     )
 
-df_names_affiliations = pd.read_csv("attendees.csv",sep='\t')
+df_names_affiliations = merge_registrations(excel_file="paid_registrations_Nov3rd.xlsx", csv_file="Ablation_workshop_internal.csv")
+
+# df_names_affiliations = pd.read_csv("attendees.csv",sep='\t')
 
 # Map your CSV’s columns to the expected ones
 column_map = {
