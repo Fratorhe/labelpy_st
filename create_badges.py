@@ -20,7 +20,8 @@ df_formatting = pd.DataFrame(
         index=["Names", "Affiliations"],
     )
 
-df_names_affiliations = merge_registrations(excel_file="paid_registrations_Nov3rd.xlsx", csv_file="Ablation_workshop_internal.csv")
+date = "Nov14th"
+df_names_affiliations = merge_registrations(excel_file=f"paid_registrations_{date}.xlsx", csv_file=f"Ablation_workshop_internal_{date}.csv")
 
 # df_names_affiliations = pd.read_csv("attendees.csv",sep='\t')
 
@@ -54,6 +55,6 @@ pdf_with_marks = add_crop_marks(
     gap_in=0.25        # same gap between badges
 )
 
-with open("cards_2up.pdf", "wb") as f:
+with open(f"cards_2up_{date}.pdf", "wb") as f:
     f.write(pdf_with_marks.getvalue())
 
